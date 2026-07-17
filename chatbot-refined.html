@@ -2039,7 +2039,7 @@
     wireCarouselFocus(car, list, nm);
     (function gen(i){
       if(i>=list.length) return;
-      getCardSnap(list[i].c, nm).then(function(u){ applySnap(slides[i].querySelector(".fc"), u); gen(i+1); });
+      getCardSnap(list[i].c, nm).then(function(u){ try{ var fc=slides[i]&&slides[i].querySelector(".fc"); if(fc) applySnap(fc, u); }catch(_){} gen(i+1); }, function(){ gen(i+1); });
     })(0);
   }
   async function showCompare(list){
@@ -3432,14 +3432,10 @@
      run(). If the thread is left visibly stuck (composer disabled, no live options, not typing) a
      few seconds after an unhandled rejection, surface a way out instead of a dead screen. */
   window.addEventListener("unhandledrejection", function(ev){
-    try{ console.error("[flow] unhandledrejection", ev && ev.reason); }catch(_){}
-    if(SANDBOX || _flowDead) return;
-    setTimeout(function(){
-      if(_flowDead || pending || !input || !input.disabled) return;
-      if(!thread || thread.childElementCount===0) return;
-      if(document.querySelector(".donemodal") || document.querySelector(".b.bot.typing")) return;
-      flowFatal(ev && ev.reason);
-    }, 3500);
+    // Diagnostic only — never user-facing. Background promises reject harmlessly all the time
+    // (card snapshots, WebGL, aborted asset fetches, image decodes); those are NOT a stuck
+    // conversation. Only a rejection of the awaited flow chain is fatal, and run().catch owns that.
+    try{ console.error("[flow] background rejection (non-fatal)", ev && ev.reason); }catch(_){}
   });
 </script>
 </body>
