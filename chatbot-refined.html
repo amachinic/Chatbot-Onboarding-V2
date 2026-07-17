@@ -39,7 +39,7 @@
   html.bare,html.bare body{background:var(--screen)}
   html.bare body{padding:0;display:block;min-height:100vh;min-height:100dvh}
   html.bare .masthead,html.bare .notch,html.bare .statusbar{display:none!important}
-  html.bare .phone{width:100%;max-width:none;height:100vh;height:100dvh;border:0;border-radius:0;box-shadow:none}
+  html.bare .phone{width:100%;max-width:none;height:100vh;height:100dvh;border:0;border-radius:0;box-shadow:none;padding-bottom:env(safe-area-inset-bottom,0px)}
   html.bare .chathead{padding-top:16px}
 
   /* chat header */
@@ -129,7 +129,7 @@
   .cardapply:active{transform:scale(.98)}
   /* ── Recommendation / product card — Universal Onboarding Flow format (centred name + match pill,
         estimated-rewards header, 3-column earn/welcome/fee strip, facts rows, "What's included") ── */
-  .rec.rec2 .fc{margin:0 0 13px}
+  .rec.rec2 .fc{margin:0 0 13px;height:auto;aspect-ratio:1.27/1}
   .rec2 .cdtitle{text-align:center;font-weight:600;font-size:19px;letter-spacing:-.02em;color:var(--ink);line-height:1.14}
   .rec2 .cdmatch{position:relative;text-align:center;margin:8px 0 15px}
   .rec2 .fitbadge{display:inline-flex;align-items:center;gap:5px;font-family:inherit;font-size:13px;font-weight:600;color:var(--lilac-ink);background:var(--lilac-tint);border:1px solid var(--lilac-line);border-radius:999px;padding:4px 11px;cursor:pointer;transition:.15s}
@@ -165,7 +165,7 @@
   .carousel::-webkit-scrollbar{display:none}
   /* Keep one nearly full-width product card in view. This gives its three fact columns enough
      room to scan while leaving a small peek of the next card to signal that the row is swipeable. */
-  .cslide{flex:0 0 min(286px,calc(100vw - 60px))}
+  .cslide{flex:0 0 min(322px,calc(100vw - 44px))}
   /* Reserve the exact rendered-card height before its snapshot/WebGL face arrives. Without this,
      each slide grows independently as it finishes rendering and the carousel visibly jumps. */
   .cslide .fc{height:auto;aspect-ratio:1.586}
@@ -1301,7 +1301,8 @@
   var _topAnchorRow=null;   // the row currently TOP-anchored (a tall recommended card / compare carousel), or null
   function scrollDown(){thread.scrollTop=thread.scrollHeight;}
   /* keep the latest message in view: re-pin a top-anchored message to ITS TOP, otherwise to the bottom */
-  function repin(){ if(_topAnchorRow && _topAnchorRow.parentNode) scrollRowTop(_topAnchorRow); else scrollDown(); }
+  var _userScrolled=false;   // set by touch/wheel on the thread; suppresses auto re-pinning so history stays scrollable
+  function repin(){ if(_userScrolled) return; if(_topAnchorRow && _topAnchorRow.parentNode) scrollRowTop(_topAnchorRow); else scrollDown(); }
   /* anchor a tall message (e.g. a recommended card) so ITS TOP is in view — so the card image
      reads first, instead of the thread jumping to the bottom of the message. */
   function scrollRowTop(row){
@@ -1314,6 +1315,8 @@
      a tall option list can cover the message that was just posted. Fires after layout, before
      paint, so the cut-off frame is never shown. */
   if(window.ResizeObserver){ try{ new ResizeObserver(function(){ repin(); }).observe(document.querySelector(".composer-wrap")); }catch(e){} }
+  thread.addEventListener("touchstart", function(){ _userScrolled=true; }, {passive:true});
+  thread.addEventListener("wheel", function(){ _userScrolled=true; }, {passive:true});
   var CK='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5l10 -10"/></svg>';
   /* Lucide-style inline icons (matching index.html’s SVG approach) */
   var IC={
@@ -1375,6 +1378,7 @@
 
   var _lastBotLen=0;   // length of the previous bot message — drives the reading beat before the next one
   async function bot(html, rich, anchorTop){
+    _userScrolled=false;   // a new turn re-engages auto-scroll
     setComposer(false, "Maison is typing…");
     var plain=html.replace(/<[^>]+>/g,"");
     /* Human pacing, two beats:
@@ -1927,6 +1931,7 @@
         confirm.disabled=true; confirm.textContent="Card confirmed";
         me("Confirm the "+c.nm); resolve();
       };
+      if(DEMO && !sbHold()) setTimeout(function(){ if(!confirm.disabled) confirm.onclick(); }, sbms(900));   // auto-play confirms too
     });
     await bot('<div class="pad"><div class="doneline"><span class="ck">'+CK+'</span>Card selected</div><div class="docsub">'+esc(c.nm)+'</div>'+
       '<div class="csmsg">Thanks for exploring! You’ve chosen your card — this is the end of this part of the study.</div></div>', true);
@@ -1960,12 +1965,19 @@
   async function showCarousel(list, introText){
     var introRow=null;
     if(introText){ var ib=await bot(introText, false, true); introRow=ib.parentNode; }
+    /* typing beat before the cards land, like any other reply */
+    var trow=document.createElement("div"); trow.className="row bot";
+    var tb=document.createElement("div"); tb.className="b bot typing"; tb.innerHTML="<span></span><span></span><span></span>";
+    trow.appendChild(tb); thread.appendChild(trow); scrollDown();
+    await delay(SANDBOX?24:1100);
+    trow.remove();
     var row=document.createElement("div"); row.className="row bot carouselrow";
     var car=document.createElement("div"); car.className="carousel";
     _slideN=0;
     car.innerHTML=list.map(function(o,i){ return compareSlide(o, i===0); }).join("");
     row.appendChild(car); thread.appendChild(row); lastSender="bot";
     var anchorRow=introRow||row; scrollRowTop(anchorRow); setTimeout(function(){ scrollRowTop(anchorRow); }, 280);
+    setTimeout(function(){ if(_topAnchorRow===anchorRow) _topAnchorRow=null; }, 1200);   // release the pin so the thread scrolls freely
     disposeCard3D();
     var nm=cardName();
     var slides=car.querySelectorAll(".cslide");

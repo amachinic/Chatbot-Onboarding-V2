@@ -30,6 +30,8 @@
       inset: 0;
       width: 100vw;
       height: 100vh;
+      height: var(--appH, 100vh);
+      height: 100dvh;
       background: #f1f1ef;
     }
 
@@ -41,6 +43,16 @@
       background: #f1f1ef;
     }
   </style>
+  <script>
+    // iOS Safari: 100vh includes the space behind the collapsible URL bar. Size the frame to the
+    // DYNAMIC viewport instead - dvh where supported, live innerHeight as the fallback.
+    (function(){
+      function fit(){ document.documentElement.style.setProperty('--appH', window.innerHeight + 'px'); }
+      window.addEventListener('resize', fit);
+      window.addEventListener('orientationchange', fit);
+      fit();
+    })();
+  </script>
 </head>
 <body>
   <div class="frame">
