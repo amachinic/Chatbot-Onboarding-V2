@@ -1544,9 +1544,10 @@
   }
   function chooseChip(it){
     if(!pending||pending.type!=="chips")return;
-    clearChips(); me(it.l);
-    var r=pending.resolve; pending=null; setComposer(false,"");
-    r(it.v);
+    var r=pending.resolve; pending=null;                                  // capture the resolver BEFORE any render
+    try{ clearChips(); me(it.l); setComposer(false,""); }
+    catch(e){ try{ console.error("[flow] chooseChip render failed", e); }catch(_){} }
+    r(it.v);                                                              // always advance — a render hiccup can't strand the turn
   }
 
   /* multi-select: toggle chips under a "Select all that apply" label, confirm with Continue */
@@ -1613,11 +1614,12 @@
   }
   function confirmMulti(){
     if(!pending||pending.type!=="multi"||!pending.selected.length)return;
-    var sel=pending.selected.slice();
-    var labels=sel.map(function(v){ var it=pending.items.filter(function(x){return x.v===v;})[0]; return it?it.l:v; });
-    clearChips(); me(labels.join(", "));
-    var r=pending.resolve; pending=null; setComposer(false,"");
-    r(sel);
+    var sel=pending.selected.slice(), items=pending.items, r=pending.resolve; pending=null;   // capture selection + resolver FIRST
+    try{
+      var labels=sel.map(function(v){ var it=items.filter(function(x){return x.v===v;})[0]; return it?it.l:v; });
+      clearChips(); me(labels.join(", ")); setComposer(false,"");
+    }catch(e){ try{ console.error("[flow] confirmMulti render failed", e); }catch(_){} }
+    r(sel);                                                              // always advance — a render hiccup can't strand the turn
   }
   /* replay the greeting's wave + gradient sweep (on load and on tap) */
   function replayGreet(b){
@@ -2362,21 +2364,28 @@
     return ctx;
   }
   function parseGroq(data){ var raw=(((data.choices||[])[0]||{}).message||{}).content||"{}"; try{ return JSON.parse(raw); }catch(e){ return {action:"answer", reply:String(raw).slice(0,300)}; } }
+  function fetchTO(url, opts, ms){                                     // fetch with a hard timeout so a stalled connection can't hang the turn
+    var ctrl = (typeof AbortController!=="undefined") ? new AbortController() : null;
+    var timer = ctrl ? setTimeout(function(){ try{ ctrl.abort(); }catch(_){} }, ms||12000) : null;
+    var o = ctrl ? Object.assign({}, opts, {signal:ctrl.signal}) : opts;
+    return fetch(url, o).then(function(r){ if(timer) clearTimeout(timer); return r; },
+                             function(e){ if(timer) clearTimeout(timer); throw e; });
+  }
   async function interpret(userText, p){
     var payload={ temperature:0.4, max_tokens:512, response_format:{type:"json_object"},
       messages:[ {role:"system",content:SYSTEM()}, {role:"user",content:buildContext(userText,p)} ] };
     // 1) serverless proxy (production — key stays server-side)
     try{
-      var resp=await fetch("/api/chat",{ method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(payload) });
+      var resp=await fetchTO("/api/chat",{ method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(payload) }, 12000);
       if(resp.ok) return parseGroq(await resp.json());
     }catch(e){}
     // 2) local key — direct call (assets/groq-key.local.js, gitignored)
     var key=groqKey();
     if(key){
       try{
-        var r2=await fetch("https://api.groq.com/openai/v1/chat/completions",{ method:"POST",
+        var r2=await fetchTO("https://api.groq.com/openai/v1/chat/completions",{ method:"POST",
           headers:{ "Authorization":"Bearer "+key, "Content-Type":"application/json" },
-          body:JSON.stringify(Object.assign({ model:GROQ_CHAT_MODEL }, payload)) });
+          body:JSON.stringify(Object.assign({ model:GROQ_CHAT_MODEL }, payload)) }, 12000);
         if(r2.ok) return parseGroq(await r2.json());
       }catch(e){}
     }
@@ -3366,13 +3375,28 @@
   function toggleInfo(e){ if(e) e.stopPropagation(); var p=document.getElementById("infopop"); if(p) p.classList.toggle("show"); }
   document.addEventListener("click", function(e){ var p=document.getElementById("infopop"); if(p && p.classList.contains("show") && !e.target.closest("#infopop") && !e.target.closest("#ibtn")) p.classList.remove("show"); });
 
+  var _flowDead=false;
+  function flowFatal(e){
+    try{ if(e) console.error("[flow] fatal", e); }catch(_){}
+    if(_flowDead || document.querySelector(".donemodal")) return;
+    _flowDead=true;
+    try{ pending=null; clearChips(); setComposer(false,""); }catch(_){}
+    try{ appendRow("bot", "Sorry \u2014 something interrupted us on my end. Tap below to start over.", false); }catch(_){}
+    try{
+      quick.innerHTML="";
+      var btn=document.createElement("button"); btn.className="chip"; btn.type="button"; btn.textContent="Restart";
+      btn.onclick=function(){ restart(); };
+      quick.appendChild(btn);
+    }catch(_){}
+  }
   function restart(){
+    _flowDead=false;
     disposeCard3D(); focusUnmount();
     thread.innerHTML=""; quick.innerHTML=""; state={}; pending=null; lastSender=null; convo=[];
     _backBtn=null; _lastMeRow=null; _backArmed=false; _recApply=null; _heroEl=null; _heroCard=null;   // reset go-back + card-pick state
     var nr=document.querySelector(".composer .namerow"); if(nr) nr.remove(); field.style.display="";  // clear any in-progress name fields
     setComposer(false,"");
-    run();
+    run().catch(flowFatal);
   }
   /* Named sandbox screens — branch / alt states that the linear demo path doesn't reach.
      sbHold() freezes all auto-advance in named mode, so each control renders filled, at rest. */
@@ -3404,7 +3428,20 @@
       var b=appendRow("bot","",true); b.innerHTML=chatDocResult(f); scrollDown();
     } else { await bot("Unknown sandbox screen: "+esc(key)); }
   }
-  if(SANDBOX_KEY) sandboxNamed(SANDBOX_KEY); else run();
+  if(SANDBOX_KEY) sandboxNamed(SANDBOX_KEY); else run().catch(flowFatal);
+  /* Last-resort net: a throw outside the await chain (a setTimeout, an event handler) can't reject
+     run(). If the thread is left visibly stuck (composer disabled, no live options, not typing) a
+     few seconds after an unhandled rejection, surface a way out instead of a dead screen. */
+  window.addEventListener("unhandledrejection", function(ev){
+    try{ console.error("[flow] unhandledrejection", ev && ev.reason); }catch(_){}
+    if(SANDBOX || _flowDead) return;
+    setTimeout(function(){
+      if(_flowDead || pending || !input || !input.disabled) return;
+      if(!thread || thread.childElementCount===0) return;
+      if(document.querySelector(".donemodal") || document.querySelector(".b.bot.typing")) return;
+      flowFatal(ev && ev.reason);
+    }, 3500);
+  });
 </script>
 </body>
 </html>
