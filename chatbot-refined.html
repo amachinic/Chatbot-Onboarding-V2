@@ -2015,13 +2015,13 @@
   /* carousel of card slides, ordered by match %% — swipe to explore, Choose on any slide */
   async function showCarousel(list, introText){
     var introRow=null;
-    if(introText){ var ib=await bot(introText, false, true); introRow=ib.parentNode;
-      if(!SANDBOX) await delay(Math.min(2400, 600+introText.replace(/<[^>]+>/g,"").length*18)); }   // let them actually READ the intro before the cards land
-    /* typing beat before the cards land, like any other reply */
+    if(introText){ var ib=await bot(introText, false, true); introRow=ib.parentNode; }
+    /* typing beat before the cards land — the dots animate a good while (read the intro as they run)
+       so the cards don't drop in the instant the intro appears. */
     var trow=document.createElement("div"); trow.className="row bot";
     var tb=document.createElement("div"); tb.className="b bot typing"; tb.innerHTML="<span></span><span></span><span></span>";
     trow.appendChild(tb); thread.appendChild(trow); scrollDown();
-    await delay(SANDBOX?24:1100);
+    await delay(SANDBOX?24:2400);
     trow.remove();
     var row=document.createElement("div"); row.className="row bot carouselrow";
     var car=document.createElement("div"); car.className="carousel";
