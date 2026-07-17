@@ -1,3 +1,6 @@
 # local-preview model key - loaded by the page when present, never committed
 assets/groq-key.local.js
 _probe.html
+
+.vercel
+.env*

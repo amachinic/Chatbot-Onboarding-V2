@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
 <title>Maison — Chat onboarding</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -434,6 +434,7 @@
   .cerr svg{flex-shrink:0}
   .composer input{flex:1;border:none;outline:none;background:none;font-family:inherit;font-size:13.5px;color:var(--ink);padding:11px 0}
   .composer input::placeholder{color:#b3aea4}
+  @media (max-width:520px){ .composer input{font-size:16px} }   /* >=16px = no iOS focus-zoom */
   /* two-field name entry (first / last) — sits in place of the single input */
   .composer .namerow{flex:1;min-width:0;display:flex;gap:7px}
   .composer .namerow input{flex:1;min-width:0;border:1.5px solid var(--line);background:#fff;border-radius:22px;padding:11px 14px;transition:.15s}
