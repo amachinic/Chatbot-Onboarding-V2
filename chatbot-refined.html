@@ -2287,16 +2287,12 @@
     }).catch(function(){ if(tok===_focusTok){ el.classList.remove("card3d-on","card3d-in"); _focusEl=null; } });
   }
   function wireCarouselFocus(car, list, name){
-    var slides=car.querySelectorAll(".cslide");
-    function focusCentered(){
-      if(!car.clientWidth) return;
-      var center=car.scrollLeft + car.clientWidth/2, best=0, bd=Infinity;
-      for(var i=0;i<slides.length;i++){ var sc=slides[i].offsetLeft+slides[i].offsetWidth/2, d=Math.abs(sc-center); if(d<bd){bd=d;best=i;} }
-      focusMount(slides[best].querySelector(".fc"), list[best].c, name);
-    }
-    var t=null;
-    car.addEventListener("scroll", function(){ if(t) clearTimeout(t); t=setTimeout(focusCentered, 130); }, {passive:true});
-    requestAnimationFrame(function(){ requestAnimationFrame(focusCentered); });   // after layout settles, so the right card is centered
+    /* Cards stay on their stable pre-rendered 3D snapshots. We used to swap a LIVE WebGL card
+       in and out of whichever slide was centered (focusMount on every scroll) — that re-rendered
+       each card snapshot -> live canvas -> snapshot, with fades, so the cards visibly "flickered /
+       reloaded" as you swiped. The snapshot is itself a 3D render, so nothing is lost visually and
+       the carousel is now rock-steady. (The single detail card in chooseShort keeps its live 3D —
+       it isn't in a scrolling carousel, so it never churns.) */
 
     // ---- desktop: drag-to-scroll (mouse) + vertical wheel → horizontal scroll ----
     var down=false, moved=false, sx=0, sl0=0;
