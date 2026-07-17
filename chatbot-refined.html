@@ -1963,7 +1963,12 @@
     detail.classList.add("cardwide", "selected-card");
     detail.parentNode.classList.add("card-detail-row");
     disposeCard3D();
-    mountCard3D(detail.querySelector(".fc"), c, {name:cardName()});
+    var dfc=detail.querySelector(".fc");
+    if(dfc){
+      if(_webglOK){ var fb=dfc.querySelector(".cardfallback"); if(fb) fb.remove();   // no flat preloaded card — the live 3D IS the card
+        dfc.style.background=(CARDGRAD[c.finish]||"linear-gradient(135deg,#514797,#6B5FB0 58%,#8B7FD0)"); }   // finish-colour placeholder during the brief WebGL load
+    }
+    mountCard3D(dfc, c, {name:cardName()});
     setComposer(false, "Review the card details, then confirm");
     var switched=await new Promise(function(resolve){
       var confirm=detail.querySelector(".cardapply");
@@ -2082,7 +2087,6 @@
     var allRanked=CARDS.map(function(c){var s=scoreCard(c);return {c:c,fit:s.fit,why:s.why};}).sort(function(a,b){return b.fit-a.fit;});
     var top3=list.slice(0,3);
     var trio=[top3[1],top3[0],top3[2]].filter(Boolean);
-    await bot("I\u2019ve got what I need. I\u2019m checking your answers against rewards, fees, and the way you spend.");
     await bot("I\u2019ve found <b>3 cards</b> for you"+(state.first?(", "+bname()):"")+". To see all your matches, tap <b>Compare</b> to view them all."
       +'<div class="cardtrio">'+trio.map(function(o,i){return '<div class="trioc t'+(i+1)+' cardicon" style="background:'+(CARDGRAD[o.c.finish]||"linear-gradient(135deg,#514797,#6B5FB0 58%,#8B7FD0)")+'">'+chipMarkup("#d7dbe1")+'</div>';}).join("")+'</div>');
     await showCarousel(top3, "Here are your top matches. Swipe through them to compare the details, or choose the one that feels right.");
@@ -3211,6 +3215,7 @@
         state.feePref=v; return "card";
       },
       card: async function(){
+        await bot("I\u2019ve got what I need. I\u2019m checking your answers against rewards, fees, and the way you spend.");
         var mb=await bot("Give me one sec — matching you to the best fit… "+ic("search",15)
           +'<div class="chatfind"><div class="findspin"><div class="findmini cardicon">'+chipMarkup("#C9C3E8")+'<span class="fck"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>'+'</div></div></div>');
         await delay(SANDBOX?40:2500);                                                 // two clean flips
