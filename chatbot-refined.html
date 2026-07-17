@@ -1854,6 +1854,13 @@
       appendRow("bot","We’re at the very start of this part"+(state.first?", "+bname():"")+" — there’s nothing earlier to go back to. Tap an option below to keep going.");
       convo.push({role:"bot", text:"(nothing earlier to go back to)"}); restoreStep(p); return;
     }
+    // Local intuition first: map the typed reply onto the on-screen options (no model needed).
+    var lm=localMatch(t, p);
+    if(lm){
+      me(t); input.value="";
+      if(applyFill(p, p.type==="multi"?lm:lm[0], t)) return;
+      restoreStep(p); return;
+    }
     me(t); input.value=""; send.disabled=true;
     setComposer(false, "Maison is thinking…");
     var th=thinkingRow();
@@ -2365,6 +2372,97 @@
       }catch(e){}
     }
     return null;   // no proxy, no key → scripted nudge
+  }
+  /* ---------- Local intuition layer (no model needed) ----------
+     Maps a typed reply onto the on-screen options: token overlap with the chip labels,
+     a synonym lexicon per option value, and numeric ranges for money steps ("about
+     $2,500 a month" -> "$1,000 - $3,000"). Only commits on a clear winner; questions,
+     negations, and ambiguous replies fall through to the model / scripted nudge. */
+  var FILL_STOP={i:1,im:1,me:1,my:1,mine:1,a:1,an:1,the:1,to:1,of:1,in:1,on:1,for:1,and:1,or:1,it:1,its:1,is:1,am:1,are:1,be:1,do:1,want:1,would:1,like:1,need:1,looking:1,look:1,mostly:1,mainly:1,please:1,just:1,really:1,that:1,this:1,with:1,get:1,about:1,around:1,per:1,month:1,a_:1,year:1,monthly:1,yearly:1,card:1,cards:1};
+  var FILL_SYN={
+    credit:["build","rebuild","building","rebuilding","fix","repair","improve","boost","score","history","establish","bad","poor"],
+    rewards:["cashback","perks","everyday","earn","earning"],
+    travel:["miles","flights","flight","flying","airlines","airline","vacation","trip","trips","abroad","hotel","hotels","lounge","lounges","international","points"],
+    purchase:["big","buy","finance","financing","installments"],
+    transfer:["balance","move","consolidate","debt","owe"],
+    cash:["cashback","money","statement"],
+    any:["both","either","mix","open"],
+    full:["payoff","completely","entirely","always"],
+    carry:["revolve","interest","some"],
+    varies:["depends","sometimes","mixed"],
+    set:["forget","simple","easy","automatic","autopilot","passive"],
+    tinker:["optimize","optimizing","maximize","maximizing","active","manage"],
+    yes:["worth","value","justify","fine","sure"],
+    no:["zero","free","without","nothing"],
+    groceries:["grocery","supermarket","food","costco"],
+    gas:["fuel","ev","charging","gasoline"],
+    dining:["restaurants","restaurant","eating","takeout","dinner","brunch"],
+    online:["shopping","shop","amazon","internet"],
+    streaming:["netflix","spotify","subscription","subscriptions","hulu"],
+    transit:["commute","commuting","subway","bus","train","metro"],
+    everything:["all","everywhere","general"],
+    go:["ready","yes","yep","start","sure","sounds","good","lets"],
+    wait:["time","think","later","hold","minute","sec"],
+    compare:["comparison","see","others","options"],
+    revise:["change","answers","redo","different"],
+    emp:["employed","job","work","working"],
+    self:["freelance","freelancer","contractor","business","own"],
+    student:["school","college","university","uni"],
+    other:["unemployed","retired","homemaker","between"]
+  };
+  function fillToks(s){
+    return (String(s).toLowerCase().replace(/&amp;/g," ").match(/[a-z0-9]+/g)||[])
+      .filter(function(w){ return !FILL_STOP[w]; });
+  }
+  function fillNum(s){
+    var m=String(s).toLowerCase().replace(/,/g,"").match(/(\d+(?:\.\d+)?)\s*(k\b)?/);
+    if(!m) return null;
+    var n=parseFloat(m[1])*(m[2]?1000:1);
+    if(/\b(under|below|less than|at most|up to)\b/.test(s)) n=n-1;
+    else if(/\b(over|above|more than|at least)\b/.test(s) || /\d\s*k?\s*\+/.test(s)) n=n+1;
+    return n;
+  }
+  function fillRange(l){
+    var s=String(l).toLowerCase().replace(/,/g,"");
+    var m=s.match(/\$?(\d+(?:\.\d+)?)(k?)\s*[–—-]\s*\$?(\d+(?:\.\d+)?)(k?)/);
+    if(m){ var kk=(m[2]||m[4])?1000:1; return [parseFloat(m[1])*kk, parseFloat(m[3])*((m[4]||m[2])?1000:1)]; }
+    m=s.match(/under\s*\$?(\d+(?:\.\d+)?)(k?)/);
+    if(m) return [0, parseFloat(m[1])*(m[2]?1000:1)-1];
+    m=s.match(/\$?(\d+(?:\.\d+)?)(k?)\s*\+/);
+    if(m) return [parseFloat(m[1])*(m[2]?1000:1), Infinity];
+    return null;
+  }
+  function localMatch(t, p){
+    if(!p || (p.type!=="chips" && p.type!=="multi")) return null;
+    var items=(p.items||[]).filter(function(i){ return !(p.noFill && p.noFill.indexOf(i.v)>=0); });
+    if(!items.length) return null;
+    var low=String(t).toLowerCase();
+    if(/^\s*(what|whats|why|how|when|where|who|which|does|is|are|should|can|could)\b/.test(low) || /\?\s*$/.test(low)) return null;   // questions go to the model
+    var qn=fillNum(low);
+    if(qn!=null){
+      var hits=items.filter(function(i){ var r=fillRange(i.l); return r && qn>=r[0] && qn<=r[1]; });
+      if(hits.length===1) return [hits[0].v];
+    }
+    var qt=fillToks(low);
+    if(!qt.length) return null;
+    var scored=items.map(function(i){
+      var lt=fillToks(i.l), syn=FILL_SYN[i.v]||[], s=0;
+      qt.forEach(function(w){
+        if(w===String(i.v).toLowerCase()){ s+=2; return; }
+        if(lt.some(function(x){ return x===w || (w.length>3 && x.length>3 && (x.indexOf(w)===0 || w.indexOf(x)===0)); })){ s+=2; return; }
+        if(syn.indexOf(w)>=0) s+=1.5;
+      });
+      return {v:i.v, s:s};
+    }).sort(function(a,b){ return b.s-a.s; });
+    var neg=/(^|\s)(not|dont|cant|never|without|except|rather)\b/.test(low.replace(/[’']/g,""));
+    if(p.type==="multi"){
+      if(neg) return null;
+      var sel=scored.filter(function(x){ return x.s>=1.5; }).map(function(x){ return x.v; });
+      return sel.length?sel:null;
+    }
+    var best=scored[0], second=scored[1];
+    if(best.s>=1.5 && (!second || best.s>second.s) && !(neg && best.v!=="no")) return [best.v];
+    return null;
   }
   function applyFill(p, value, raw){
     if(p.type==="chips"){
