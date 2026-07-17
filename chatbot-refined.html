@@ -168,7 +168,7 @@
   .cslide{flex:0 0 min(322px,calc(100vw - 44px))}
   /* Reserve the exact rendered-card height before its snapshot/WebGL face arrives. Without this,
      each slide grows independently as it finishes rendering and the carousel visibly jumps. */
-  .cslide .fc{height:auto;aspect-ratio:1.586}
+  .cslide .fc{height:auto;aspect-ratio:1.586}  /* same as base .fc; kept for clarity */
   .cslide .rec{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 8px 22px -14px rgba(20,20,18,.35)}
   /* In the narrow comparison cards there isn't room for label + value on one line, so stack the
      facts rows (label above, value below, left-aligned) — keeps long values from being cut off.
@@ -288,7 +288,7 @@
 
   /* final card */
   /* .fc is the three.js card mount target + a finish-colour placeholder (no flat card art) */
-  .fc{height:auto;aspect-ratio:1.65;border-radius:14px;position:relative;overflow:hidden;box-shadow:0 16px 34px -16px rgba(48,38,24,.65);margin:2px 0 0}
+  .fc{height:auto;aspect-ratio:1.586;border-radius:3.89%/6.17%;position:relative;overflow:hidden;box-shadow:0 16px 34px -16px rgba(48,38,24,.65);margin:2px 0 0}
   /* real 3D (three.js) card mounts a <canvas> on top of the flat .fc, which stays as the
      no-WebGL fallback. While 3D is live: transparent box (card letterboxed for tilt headroom),
      flat art hidden. On dispose the flat card simply shows again. */
@@ -309,7 +309,7 @@
   .fc .cardspin{width:30px;height:30px;border-radius:50%;border:3px solid rgba(111,99,173,.18);border-top-color:#6F63AD;animation:cardspin .8s linear infinite}
   /* A rendered card image is always present beneath the loader/canvas. It prevents an empty
      placeholder if WebGL is unavailable or the live module is still loading. */
-  .fc .cardfallback{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:center;border-radius:inherit;display:block}
+  .fc .cardfallback{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;border-radius:inherit;display:block}
   @keyframes cardspin{to{transform:rotate(360deg)}}
   /* confetti bursts INSIDE the card-ready message bubble (ported from the onboarding) — capped to the
      visible top region (congrats + card) so particles actually fall into view instead of off a tall canvas */
