@@ -2015,7 +2015,8 @@
   /* carousel of card slides, ordered by match %% — swipe to explore, Choose on any slide */
   async function showCarousel(list, introText){
     var introRow=null;
-    if(introText){ var ib=await bot(introText, false, true); introRow=ib.parentNode; }
+    if(introText){ var ib=await bot(introText, false, true); introRow=ib.parentNode;
+      if(!SANDBOX) await delay(Math.min(2400, 600+introText.replace(/<[^>]+>/g,"").length*18)); }   // let them actually READ the intro before the cards land
     /* typing beat before the cards land, like any other reply */
     var trow=document.createElement("div"); trow.className="row bot";
     var tb=document.createElement("div"); tb.className="b bot typing"; tb.innerHTML="<span></span><span></span><span></span>";
@@ -2082,11 +2083,9 @@
     var top3=list.slice(0,3);
     var trio=[top3[1],top3[0],top3[2]].filter(Boolean);
     await bot("I\u2019ve got what I need. I\u2019m checking your answers against rewards, fees, and the way you spend.");
-    await bot("I\u2019ll bring you a few strong options \u2014 then you can look through the details at your own pace.");
     await bot("I\u2019ve found <b>3 cards</b> for you"+(state.first?(", "+bname()):"")+". To see all your matches, tap <b>Compare</b> to view them all."
       +'<div class="cardtrio">'+trio.map(function(o,i){return '<div class="trioc t'+(i+1)+' cardicon" style="background:'+(CARDGRAD[o.c.finish]||"linear-gradient(135deg,#514797,#6B5FB0 58%,#8B7FD0)")+'">'+chipMarkup("#d7dbe1")+'</div>';}).join("")+'</div>');
-    await bot("Here are your top matches. Swipe through them to compare the details, or choose the one that feels right.", false, true);
-    await showCarousel(top3);
+    await showCarousel(top3, "Here are your top matches. Swipe through them to compare the details, or choose the one that feels right.");
     function recTurn(){   // resolves via a chip, a slide's Choose button, or free text
       return new Promise(function(resolve){
         var done=false;
