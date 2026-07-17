@@ -301,6 +301,7 @@
   /* three.js-rendered PNG still — the card for non-focused slides, and the placeholder beneath a loading live canvas */
   .fc .cardsnap{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:center;border-radius:inherit;display:none;animation:card3dfade .4s ease both}
   .fc.has-snap .cardsnap{display:block}
+  .b.superseded{opacity:.55}.b.superseded .cardapply{pointer-events:none}   /* details replaced by a newer choice */
   .fc.card3d-in .cardsnap,.fc.card3d-in .cardfallback{visibility:hidden}   /* live canvas ready -> hide the still beneath it */
   /* full-cover loader: a clean light surface + lilac spinner (no dark/purple block), masks the
      finish-colour box and the canvas' first-frame resize, then fades to reveal the card */
@@ -1935,25 +1936,36 @@
   /* §6 — discovery-only ending. The recommendation card IS the product-details view (its CTA reads
      "I choose this card"), so once they choose we just confirm with a "Card selected" thank-you.
      No verification follows — the experience stops here. */
-  async function chooseShort(c){
+  async function chooseShort(c, again){
     await delay(SANDBOX?40:450);
     var rankedCard=(state.ranked||[]).filter(function(o){return o.c.id===c.id;})[0]||{c:c,fit:scoreCard(c).fit};
-    await bot("Great choice. Here are the full details for <b>"+esc(c.nm)+"</b>.");
+    await bot(again?("Sure — here are the full details for <b>"+esc(c.nm)+"</b> instead.")
+      :("Great choice. Here are the full details for <b>"+esc(c.nm)+"</b>. Nothing’s locked in yet — you can scroll up and choose a different card until you confirm."));
     var detail=await bot(recBubble(rankedCard, true, "selected", "Confirm this card", true), true, true);
     detail.classList.add("cardwide", "selected-card");
     detail.parentNode.classList.add("card-detail-row");
     disposeCard3D();
     mountCard3D(detail.querySelector(".fc"), c, {name:cardName()});
     setComposer(false, "Review the card details, then confirm");
-    await new Promise(function(resolve){
+    var switched=await new Promise(function(resolve){
       var confirm=detail.querySelector(".cardapply");
       confirm.onclick=function(){
         if(confirm.disabled) return;
         confirm.disabled=true; confirm.textContent="Card confirmed";
-        me("Confirm the "+c.nm); resolve();
+        me("Confirm the "+c.nm); resolve(null);
       };
+      /* the carousel up-thread stays live: Choose on a different card swaps these details */
+      _recApply=function(card){ if(card.id===c.id) return; resolve(card); };
       if(DEMO && !sbHold()) setTimeout(function(){ if(!confirm.disabled) confirm.onclick(); }, sbms(900));   // auto-play confirms too
     });
+    _recApply=null;
+    if(switched){
+      var cf=detail.querySelector(".cardapply"); if(cf) cf.disabled=true;   // retire this details card
+      detail.classList.add("superseded");
+      me((SHORT?"I choose the ":"Apply for the ")+switched.nm+" instead");
+      return chooseShort(switched, true);
+    }
+    state.card=c;
     await bot('<div class="pad"><div class="doneline"><span class="ck">'+CK+'</span>Card selected</div><div class="docsub">'+esc(c.nm)+'</div>'+
       '<div class="csmsg">Thanks for exploring! You’ve chosen your card — this is the end of this part of the study.</div></div>', true);
     setComposer(false, "End of the study — thanks for exploring!");
