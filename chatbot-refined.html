@@ -1625,10 +1625,17 @@
   }
   function toggleMulti(it){
     if(!pending||pending.type!=="multi")return;
-    var i=pending.selected.indexOf(it.v);
-    if(i>=0) pending.selected.splice(i,1); else pending.selected.push(it.v);
-    quick.querySelectorAll(".chip[data-v]").forEach(function(b){ b.classList.toggle("on", pending.selected.indexOf(b.dataset.v)>=0); });
-    var done=document.getElementById("multidone"); if(done) done.disabled=pending.selected.length===0;
+    var sel=pending.selected, hasEvery=(pending.items||[]).some(function(x){return x.v==='everything';});
+    if(hasEvery && it.v==='everything'){
+      if(sel.indexOf('everything')>=0) sel.length=0;                // tapping a lit "Everything" clears the lot
+      else { sel.length=0; sel.push('everything'); }                // "Everything" selects — and lights up — every option
+    } else {
+      var ei=sel.indexOf('everything'); if(ei>=0) sel.splice(ei,1); // picking a specific category drops "Everything"
+      var i=sel.indexOf(it.v); if(i>=0) sel.splice(i,1); else sel.push(it.v);
+    }
+    var everyOn=sel.indexOf('everything')>=0;
+    quick.querySelectorAll(".chip[data-v]").forEach(function(b){ b.classList.toggle("on", everyOn || sel.indexOf(b.dataset.v)>=0); });
+    var done=document.getElementById("multidone"); if(done) done.disabled=sel.length===0;
   }
   function confirmMulti(){
     if(!pending||pending.type!=="multi"||!pending.selected.length)return;
