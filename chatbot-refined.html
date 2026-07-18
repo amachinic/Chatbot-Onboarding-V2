@@ -2107,7 +2107,7 @@
         var done=false;
         function finish(r){ if(done)return; done=true; _recApply=null; resolve(r); }
         _recApply=function(card){ pending=null; clearChips(); setComposer(false, ""); me("Apply for the "+card.nm); finish({a:"apply",card:card}); };
-        var items=[{l:"Compare cards",v:"compare"},{l:"Change my answers",v:"revise"}];
+        var items=[{l:"Compare all cards",v:"compare"},{l:"Change my answers",v:"revise"}];
         pending={type:"chips", items:items, resolve:function(v){ finish({a:v}); }, ph:"Ask a question, or tap an option\u2026"};
         renderChips(pending.items); setComposer(true, pending.ph); armBack();
         if(SANDBOX_AT && !window._didCmpX){ if(!sbHold()) setTimeout(function(){ if(_recApply) _recApply(list[0].c); }, sbms(700)); }
